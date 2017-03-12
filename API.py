@@ -54,7 +54,14 @@ app.secret_key = "Estodeberiaserandom"
 
 class Productos(Resource):
 	def get(self, idP):
-		return {idP: productos[idP]}
+
+		con = mysql.connect()
+		cursor = con.cursor()
+
+		cursor.execute("SELECT * FROM producto WHERE idProducto=%s", (idP))
+		producto = cursor.fetchone()
+
+		return dict(id=producto[0], nombre=producto[1], descripcion=producto[2], foto=producto[3], precio=producto[4], cantVendida=producto[5], idCategoria=producto[6])
 
 	def put(self, idP):
 		productos[idP] = request.form['data']
