@@ -198,7 +198,7 @@ class Login(Resource):
 		return errors['ErrorLogin'], 410
 
 class InfoUser(Resource):
-	def get(self, usr):
+	def get(self):
 
 		usuario = request.headers.get('access_token')
 		con = mysql.connect()
@@ -219,7 +219,7 @@ api.add_resource(Register, '/register')
 api.add_resource(Login, '/login')
 api.add_resource(Productos, '/productos/<string:idP>', endpoint='prod_ep')
 api.add_resource(ProductosList, '/productos')
-api.add_resource(InfoUser, '/<string:usr>')
+api.add_resource(InfoUser, '/usuario')
 
 
 if __name__ == '__main__':
