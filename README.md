@@ -1,2 +1,2 @@
-# Flask-API_REST
-Un API RESTful usando Flask para la materia de Aplicaciones con la Tecnología Internet II
+# Flask API RESTful
+![alt tag] (https://github.com/alejandrombc/Flask-API_REST/blob/master/modeloBD.png)
