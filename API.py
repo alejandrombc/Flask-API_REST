@@ -197,12 +197,29 @@ class Login(Resource):
 
 		return errors['ErrorLogin'], 410
 
+class InfoUser(Resource):
+	def get(self, usr):
+
+		usuario = request.headers.get('access_token')
+		con = mysql.connect()
+		cursor = con.cursor()
+
+		if(usuario != None): 
+			decod = jwt.decode(usuario, 'secret')
+
+			cursor.execute("SELECT * FROM cliente WHERE email=%s", (decod['sub']))
+			data = cursor.fetchone()
+			return dict(nombre=data[1], apellido=data[2], fotoPerfil=data[5], fechaNacimiento=data[6], genero=data[7], telefono=data[8], ciudad=data[9])
+
+		return errors['RecursoNoExistente'], 404
+
 
 
 api.add_resource(Register, '/register')
 api.add_resource(Login, '/login')
 api.add_resource(Productos, '/productos/<string:idP>', endpoint='prod_ep')
 api.add_resource(ProductosList, '/productos')
+api.add_resource(InfoUser, '/<string:usr>')
 
 
 if __name__ == '__main__':
