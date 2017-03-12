@@ -20,6 +20,11 @@ errors = {
         'message': "Las credenciales ingresadas no son validas",
         'status': 410,
         'login_value': False,
+    },
+    'ProductoNotFound': {
+        'message': "El producto seleccionado no existe",
+        'status': 410,
+        'product_value': False,
     }
 }
 
@@ -61,7 +66,9 @@ class Productos(Resource):
 		cursor.execute("SELECT * FROM producto WHERE idProducto=%s", (idP))
 		producto = cursor.fetchone()
 
-		return dict(id=producto[0], nombre=producto[1], descripcion=producto[2], foto=producto[3], precio=producto[4], cantVendida=producto[5], idCategoria=producto[6])
+		if(producto != None): return dict(id=producto[0], nombre=producto[1], descripcion=producto[2], foto=producto[3], precio=producto[4], cantVendida=producto[5], idCategoria=producto[6])
+
+		return errors['ProductoNotFound']
 
 	def put(self, idP):
 		productos[idP] = request.form['data']
