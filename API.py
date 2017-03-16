@@ -30,6 +30,11 @@ errors = {
         'message': "El producto que sea ingresar ya esta creado",
         'status': 410,
         'product_value': False,
+    },
+   	'ErrorPeticion': {
+        'message': "Error en la peticion",
+        'status': 400,
+        'login_value': False, #no entiendo este parametro
     }
 }
 
