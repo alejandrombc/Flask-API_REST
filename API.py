@@ -1,7 +1,7 @@
 from flask import Flask, request, json
 from flask_restful import Resource, Api, reqparse, abort
 from datetime import datetime, date, time, timedelta
-import jwt, calendar, hashlib, time
+import jwt, calendar, hashlib, time, re
 from flaskext.mysql import MySQL
 
 
@@ -34,7 +34,12 @@ errors = {
    	'ErrorPeticion': {
         'message': "Error en la peticion",
         'status': 400,
-        'login_value': False, #no entiendo este parametro
+        'err_value': False,
+    },
+    'ErrorAlDecodificar': {
+        'message': "Error al decodificar el token",
+        'status': 412,
+        'login_value': False,
     }
 }
 
@@ -70,8 +75,8 @@ mysql = MySQL()
 mysql.init_app(app)
 
 app.config['MYSQL_DATABASE_USER'] = 'root'
-# app.config['MYSQL_DATABASE_PASSWORD'] = '123'
-app.config['MYSQL_DATABASE_PASSWORD'] = ''
+app.config['MYSQL_DATABASE_PASSWORD'] = '123'
+# app.config['MYSQL_DATABASE_PASSWORD'] = ''
 app.config['MYSQL_DATABASE_DB'] = 'jgastore'
 app.config['MYSQL_DATABASE_HOST'] = 'localhost'
 app.secret_key = "Estodeberiaserandom"
@@ -80,7 +85,9 @@ class Register(Resource):
 	def post(self):
 		data = request.get_json()
 
-		if ('email' not in data) or ('password' not in data):
+		if ('email' not in data) or ('password' not in data) or \
+		(re.match('^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,4})$', data['email']) == None) or \
+		(len(str(data['password'])) < 8):
 			return errors['ErrorPeticion'], 400
 
 		con = mysql.connect()
@@ -91,7 +98,7 @@ class Register(Resource):
 		if ('apellido') not in data:
 			data['apellido'] = None
 		if ('username') not in data:
-			data['username'] = None
+			data['username'] = data['email'].split("@")[0]
 		if ('fotoPerfil') not in data:
 			data['fotoPerfil'] = None
 		if ('fechaNacimiento') not in data:
@@ -108,10 +115,8 @@ class Register(Resource):
 		email_actual = cursor.fetchone()
 		if(email_actual != None): return errors['UsuarioExistente'], 409
 		hashinput_password = hashlib.sha256(str(data['password']).encode('utf-8')).hexdigest() #Le hice cifrado sha256
-		hashinput_user = hashlib.sha256(str(data['username']).encode('utf-8')).hexdigest() #Le hice cifrado sha256
 
-		print( hashinput_user ) 
-		cursor.execute("INSERT INTO cliente VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)", (hashinput_email, data['nombre'], data['apellido'], hashinput_user, hashinput_password, data['fotoPerfil'],data['fechaNacimiento'],data['genero'],data['telefono'],data['ciudad']))
+		cursor.execute("INSERT INTO cliente VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)", (hashinput_email, data['nombre'], data['apellido'], data['username'], hashinput_password, data['fotoPerfil'],data['fechaNacimiento'],data['genero'],data['telefono'],data['ciudad']))
 		con.commit()
 		return success['RegistroCompletado'], 201
 
@@ -120,22 +125,16 @@ class Login(Resource):
 
 		data = request.get_json()
 
-		if ('email' not in data and 'username' not in data) or ('password' not in data):
+		if ('email' not in data) or ('password' not in data):
 			return errors['ErrorPeticion'], 400
 
-
-		if 'username' not in data:
-			usuario = 'email';
-		else:
-			usuario = 'username';
-
-		hashinput_usuario = hashlib.sha256(str(data[usuario]).encode('utf-8')).hexdigest() #Le hice cifrado sha256
+		hashinput_usuario = hashlib.sha256(str(data['email']).encode('utf-8')).hexdigest() #Le hice cifrado sha256
 		hashinput_password = hashlib.sha256(str(data['password']).encode('utf-8')).hexdigest() #Le hice cifrado sha256
 
 		con = mysql.connect()
 		cursor = con.cursor()
 
-		cursor.execute("SELECT email FROM cliente WHERE (email=%s OR username=%s) AND password=%s", (hashinput_usuario,hashinput_usuario,hashinput_password))
+		cursor.execute("SELECT email FROM cliente WHERE email=%s AND password=%s", (hashinput_usuario, hashinput_password))
 		check_log = cursor.fetchone()
 
 
@@ -155,7 +154,6 @@ class Login(Resource):
 
 			cod = jwt.encode( payload , 'secret', algorithm='HS256')
 			cod = str(cod).split("'")
-			# decod = jwt.decode('eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE0ODg3MzI0MTcuODE3NjAyNiwic3ViIjoiZ3JlZ2Nhc3RybyIsImlhdCI6MTQ4ODczMDYxNy44MTc2MDI2fQ.nP_agpytvkn1l2QsNrrSJtZ-PB69pxUvQ8SVp1SbRY4', 'secret')
 
 			success['LoginCompletado']['access_token'] = cod[1]
 			return success['LoginCompletado'], 200
@@ -191,10 +189,22 @@ class ProductosList(Resource):
 		con = mysql.connect()
 		cursor = con.cursor()
 
-		cursor.execute("SELECT idProducto from producto WHERE idProducto=%s", (producto['idProducto']))
-		hay_producto = cursor.fetchone()
+		if ('nombre' not in producto) or ('precio' not in producto):
+			return errors['ErrorPeticion'], 400
 
-		if(hay_producto != None): return errors['ProductoYaCreado'], 410
+		cursor.execute("SELECT COUNT(*) FROM producto")
+		data = cursor.fetchone()
+		producto['idProducto'] = int(data[0]) + 1;
+
+		if ('foto') not in producto:
+			producto['foto'] = None
+		if ('cantVendida') not in producto:
+			producto['cantVendida'] = 0
+		if ('idCategoria') not in producto:
+			producto['idCategoria'] = None
+		if ('descripcion') not in producto:
+			producto['descripcion'] = None
+
 
 		cursor.execute("INSERT INTO producto VALUES (%s,%s,%s,%s,%s,%s,%s)", (producto['idProducto'], producto['nombre'], producto['descripcion'], producto['foto'], producto['precio'], producto['cantVendida'], producto['idCategoria']))
 		con.commit()
@@ -207,19 +217,20 @@ class ProductosList(Resource):
 		con = mysql.connect()
 		cursor = con.cursor()
 
+		if ('idProducto' not in producto):
+			return errors['ErrorPeticion'], 400
+
 		cursor.execute("SELECT * from producto WHERE idProducto=%s", (producto['idProducto']))
 		hay_producto = cursor.fetchone()
 
-		if(hay_producto == None): return errors['ProductoNotFound'], 410
+		if(hay_producto == None): return errors['ProductoNotFound'], 404
 
-
-		if(producto['idProducto'] == None): producto['idProducto'] = hay_producto[0]
-		if(producto['nombre'] == None): producto['nombre'] = hay_producto[1]
-		if(producto['descripcion'] == None): producto['descripcion'] = hay_producto[2]
-		if(producto['foto'] == None): producto['foto'] = hay_producto[3]
-		if(producto['precio'] == None): producto['precio'] = hay_producto[4]	
-		if(producto['cantVendida'] == None): producto['cantVendida'] = hay_producto[5]	
-		if(producto['idCategoria'] == None): producto['idCategoria'] = hay_producto[6]	
+		if('nombre' not in producto or producto['nombre'] == None): producto['nombre'] = hay_producto[1]
+		if('descripcion' not in producto or producto['descripcion'] == None): producto['descripcion'] = hay_producto[2]
+		if('foto' not in producto or producto['foto'] == None): producto['foto'] = hay_producto[3]
+		if('precio' not in producto or producto['precio'] == None): producto['precio'] = hay_producto[4]	
+		if('cantVendida' not in producto or producto['cantVendida'] == None): producto['cantVendida'] = hay_producto[5]	
+		if('idCategoria' not in producto or producto['idCategoria'] == None): producto['idCategoria'] = hay_producto[6]	
 
 
 		cursor.execute("UPDATE producto SET idProducto=%s, nombre=%s, descripcion=%s, foto=%s, precio=%s, cantVendida=%s, idCategoria=%s WHERE idProducto=%s", (producto['idProducto'], producto['nombre'], producto['descripcion'], producto['foto'], producto['precio'], producto['cantVendida'], producto['idCategoria'], producto['idProducto']))
@@ -235,12 +246,13 @@ class InfoUser(Resource):
 		cursor = con.cursor()
 
 		if(usuario != None): 
-			decod = jwt.decode(usuario, 'secret')
-
+			try:
+				decod = jwt.decode(usuario, 'secret')
+			except jwt.InvalidTokenError:
+				return errors['ErrorAlDecodificar'], 412
 			cursor.execute("SELECT * FROM cliente WHERE email=%s", (decod['sub']))
 			data = cursor.fetchone()
 			return dict(nombre=data[1], apellido=data[2], fotoPerfil=data[5], fechaNacimiento=data[6], genero=data[7], telefono=data[8], ciudad=data[9])
-
 		return errors['RecursoNoExistente'], 404
 
 
