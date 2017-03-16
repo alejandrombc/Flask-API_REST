@@ -65,12 +65,97 @@ mysql = MySQL()
 mysql.init_app(app)
 
 app.config['MYSQL_DATABASE_USER'] = 'root'
-app.config['MYSQL_DATABASE_PASSWORD'] = '123'
-# app.config['MYSQL_DATABASE_PASSWORD'] = ''
+# app.config['MYSQL_DATABASE_PASSWORD'] = '123'
+app.config['MYSQL_DATABASE_PASSWORD'] = ''
 app.config['MYSQL_DATABASE_DB'] = 'jgastore'
 app.config['MYSQL_DATABASE_HOST'] = 'localhost'
 app.secret_key = "Estodeberiaserandom"
 
+class Register(Resource):
+	def post(self):
+		data = request.get_json()
+
+		if ('email' not in data) or ('password' not in data):
+			return errors['ErrorPeticion'], 400
+
+		con = mysql.connect()
+		cursor = con.cursor()
+
+		if ('nombre') not in data:
+			data['nombre'] = None
+		if ('apellido') not in data:
+			data['apellido'] = None
+		if ('username') not in data:
+			data['username'] = None
+		if ('fotoPerfil') not in data:
+			data['fotoPerfil'] = None
+		if ('fechaNacimiento') not in data:
+			data['fechaNacimiento'] = None
+		if ('genero') not in data:
+			data['genero'] = None
+		if ('telefono') not in data:
+			data['telefono'] = None
+		if ('ciudad') not in data:
+			data['ciudad'] = None
+
+		hashinput_email = hashlib.sha256(str(data['email']).encode('utf-8')).hexdigest() #Le hice cifrado sha256
+		cursor.execute("SELECT email from cliente WHERE email=%s", (hashinput_email))
+		email_actual = cursor.fetchone()
+		if(email_actual != None): return errors['UsuarioExistente'], 409
+		hashinput_password = hashlib.sha256(str(data['password']).encode('utf-8')).hexdigest() #Le hice cifrado sha256
+		hashinput_user = hashlib.sha256(str(data['username']).encode('utf-8')).hexdigest() #Le hice cifrado sha256
+
+		print( hashinput_user ) 
+		cursor.execute("INSERT INTO cliente VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)", (hashinput_email, data['nombre'], data['apellido'], hashinput_user, hashinput_password, data['fotoPerfil'],data['fechaNacimiento'],data['genero'],data['telefono'],data['ciudad']))
+		con.commit()
+		return success['RegistroCompletado'], 201
+
+class Login(Resource):
+	def post(self):
+
+		data = request.get_json()
+
+		if ('email' not in data and 'username' not in data) or ('password' not in data):
+			return errors['ErrorPeticion'], 400
+
+
+		if 'username' not in data:
+			usuario = 'email';
+		else:
+			usuario = 'username';
+
+		hashinput_usuario = hashlib.sha256(str(data[usuario]).encode('utf-8')).hexdigest() #Le hice cifrado sha256
+		hashinput_password = hashlib.sha256(str(data['password']).encode('utf-8')).hexdigest() #Le hice cifrado sha256
+
+		con = mysql.connect()
+		cursor = con.cursor()
+
+		cursor.execute("SELECT email FROM cliente WHERE (email=%s OR username=%s) AND password=%s", (hashinput_usuario,hashinput_usuario,hashinput_password))
+		check_log = cursor.fetchone()
+
+
+		if(check_log != None): 
+			#Obtengo la fecha y hora actual
+			ahora = time.time()
+			#Sumo 30 minutos a la fecha actual
+			mas_30_min = 30*60
+			hoy_mas_30_minutos = ahora + mas_30_min
+
+
+			payload = {
+			    'sub' : hashinput_usuario,
+			    'iat' : ahora,
+			    'exp' : hoy_mas_30_minutos
+			}
+
+			cod = jwt.encode( payload , 'secret', algorithm='HS256')
+			cod = str(cod).split("'")
+			# decod = jwt.decode('eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE0ODg3MzI0MTcuODE3NjAyNiwic3ViIjoiZ3JlZ2Nhc3RybyIsImlhdCI6MTQ4ODczMDYxNy44MTc2MDI2fQ.nP_agpytvkn1l2QsNrrSJtZ-PB69pxUvQ8SVp1SbRY4', 'secret')
+
+			success['LoginCompletado']['access_token'] = cod[1]
+			return success['LoginCompletado'], 200
+
+		return errors['ErrorLogin'], 410
 
 class Productos(Resource):
 	def get(self, idP):
@@ -84,7 +169,6 @@ class Productos(Resource):
 		if(producto != None): return dict(id=producto[0], nombre=producto[1], descripcion=producto[2], foto=producto[3], precio=producto[4], cantVendida=producto[5], idCategoria=producto[6])
 
 		return errors['ProductoNotFound'], 404
-
 
 class ProductosList(Resource):
 	def get(self):
@@ -137,65 +221,6 @@ class ProductosList(Resource):
 		con.commit()
 
 		return success['ProductoEditado'], 200
-
-
-class Register(Resource):
-	def post(self):
-		data = request.get_json()
-
-		con = mysql.connect()
-		cursor = con.cursor()
-
-		hashinput_email = hashlib.sha256(str(data['email']).encode('utf-8')).hexdigest() #Le hice cifrado sha256
-		cursor.execute("SELECT email from cliente WHERE email=%s", (hashinput_email))
-		email_actual = cursor.fetchone()
-
-		if(email_actual != None): return errors['UsuarioExistente'], 409
-
-		hashinput_password = hashlib.sha256(str(data['password']).encode('utf-8')).hexdigest() #Le hice cifrado sha256
-
-		hashinput_user = hashlib.sha256(str(data['username']).encode('utf-8')).hexdigest() #Le hice cifrado sha256
-
-		cursor.execute("INSERT INTO cliente VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)", (hashinput_email, data['nombre'], data['apellido'], hashinput_user, hashinput_password, data['fotoPerfil'],data['fechaNacimiento'],data['genero'],data['telefono'],data['ciudad']))
-		con.commit()
-		return success['RegistroCompletado'], 201
-
-
-class Login(Resource):
-	def post(self):
-
-		data = request.get_json()
-		hashinput_email = hashlib.sha256(str(data['email']).encode('utf-8')).hexdigest() #Le hice cifrado sha256
-		hashinput_password = hashlib.sha256(str(data['password']).encode('utf-8')).hexdigest() #Le hice cifrado sha256
-
-		con = mysql.connect()
-		cursor = con.cursor()
-
-		cursor.execute("SELECT email FROM cliente WHERE email=%s AND password=%s", (hashinput_email,hashinput_password))
-		check_log = cursor.fetchone()
-
-		if(check_log != None): 
-			#Obtengo la fecha y hora actual
-			ahora = time.time()
-			#Sumo 30 minutos a la fecha actual
-			mas_30_min = 30*60
-			hoy_mas_30_minutos = ahora + mas_30_min
-
-
-			payload = {
-			    'sub' : hashinput_email,
-			    'iat' : ahora,
-			    'exp' : hoy_mas_30_minutos
-			}
-
-			cod = jwt.encode( payload , 'secret', algorithm='HS256')
-			cod = str(cod).split("'")
-			# decod = jwt.decode('eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE0ODg3MzI0MTcuODE3NjAyNiwic3ViIjoiZ3JlZ2Nhc3RybyIsImlhdCI6MTQ4ODczMDYxNy44MTc2MDI2fQ.nP_agpytvkn1l2QsNrrSJtZ-PB69pxUvQ8SVp1SbRY4', 'secret')
-
-			success['LoginCompletado']['access_token'] = cod[1]
-			return success['LoginCompletado'], 200
-
-		return errors['ErrorLogin'], 410
 
 class InfoUser(Resource):
 	def get(self):
