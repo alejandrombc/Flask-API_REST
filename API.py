@@ -65,6 +65,11 @@ success = {
     	'message': "Producto editado exitosamente",
     	'status' : 200,
     	'product_value' : True
+    },
+    'ProductoEliminado':{
+    	'message': "Producto eliminado exitosamente",
+    	'status' : 200,
+    	'product_value' : True
     }
 }
 
@@ -160,7 +165,7 @@ class Login(Resource):
 
 		return errors['ErrorLogin'], 410
 
-class Productos(Resource):
+class Product(Resource):
 	def get(self, idP):
 
 		con = mysql.connect()
@@ -173,7 +178,45 @@ class Productos(Resource):
 
 		return errors['ProductoNotFound'], 404
 
-class ProductosList(Resource):
+	def put(self, idP):
+		producto = request.get_json()
+
+		con = mysql.connect()
+		cursor = con.cursor()
+
+		cursor.execute("SELECT * from producto WHERE idProducto=%s", (idP))
+		hay_producto = cursor.fetchone()
+
+		if(hay_producto == None): return errors['ProductoNotFound'], 404
+
+		if('nombre' not in producto or producto['nombre'] == None): producto['nombre'] = hay_producto[1]
+		if('descripcion' not in producto or producto['descripcion'] == None): producto['descripcion'] = hay_producto[2]
+		if('foto' not in producto or producto['foto'] == None): producto['foto'] = hay_producto[3]
+		if('precio' not in producto or producto['precio'] == None): producto['precio'] = hay_producto[4]	
+		if('cantVendida' not in producto or producto['cantVendida'] == None): producto['cantVendida'] = hay_producto[5]	
+		if('idCategoria' not in producto or producto['idCategoria'] == None): producto['idCategoria'] = hay_producto[6]	
+
+
+		cursor.execute("UPDATE producto SET nombre=%s, descripcion=%s, foto=%s, precio=%s, cantVendida=%s, idCategoria=%s WHERE idProducto=%s", (producto['nombre'], producto['descripcion'], producto['foto'], producto['precio'], producto['cantVendida'], producto['idCategoria'], idP))
+		con.commit()
+
+		return success['ProductoEditado'], 200
+
+	def delete(self, idP):
+		con = mysql.connect()
+		cursor = con.cursor()
+
+		cursor.execute("SELECT * from producto WHERE idProducto=%s", (idP))
+		hay_producto = cursor.fetchone()
+
+		if(hay_producto == None): return errors['ProductoNotFound'], 404
+
+		cursor.execute("DELETE FROM  producto WHERE idProducto=%s", (idP))
+		con.commit()
+
+		return success['ProductoEliminado'], 200
+
+class ProductList(Resource):
 	def get(self):
 		con = mysql.connect()
 		cursor = con.cursor()
@@ -211,33 +254,6 @@ class ProductosList(Resource):
 
 		return success['ProductoAgregado'], 200
 
-	def put(self):
-		producto = request.get_json()
-
-		con = mysql.connect()
-		cursor = con.cursor()
-
-		if ('idProducto' not in producto):
-			return errors['ErrorPeticion'], 400
-
-		cursor.execute("SELECT * from producto WHERE idProducto=%s", (producto['idProducto']))
-		hay_producto = cursor.fetchone()
-
-		if(hay_producto == None): return errors['ProductoNotFound'], 404
-
-		if('nombre' not in producto or producto['nombre'] == None): producto['nombre'] = hay_producto[1]
-		if('descripcion' not in producto or producto['descripcion'] == None): producto['descripcion'] = hay_producto[2]
-		if('foto' not in producto or producto['foto'] == None): producto['foto'] = hay_producto[3]
-		if('precio' not in producto or producto['precio'] == None): producto['precio'] = hay_producto[4]	
-		if('cantVendida' not in producto or producto['cantVendida'] == None): producto['cantVendida'] = hay_producto[5]	
-		if('idCategoria' not in producto or producto['idCategoria'] == None): producto['idCategoria'] = hay_producto[6]	
-
-
-		cursor.execute("UPDATE producto SET idProducto=%s, nombre=%s, descripcion=%s, foto=%s, precio=%s, cantVendida=%s, idCategoria=%s WHERE idProducto=%s", (producto['idProducto'], producto['nombre'], producto['descripcion'], producto['foto'], producto['precio'], producto['cantVendida'], producto['idCategoria'], producto['idProducto']))
-		con.commit()
-
-		return success['ProductoEditado'], 200
-
 class InfoUser(Resource):
 	def get(self):
 
@@ -259,9 +275,9 @@ class InfoUser(Resource):
 
 api.add_resource(Register, '/register')
 api.add_resource(Login, '/login')
-api.add_resource(Productos, '/productos/<string:idP>', endpoint='prod_ep')
-api.add_resource(ProductosList, '/productos')
-api.add_resource(InfoUser, '/usuario')
+api.add_resource(Product, '/product/<string:idP>', endpoint='prod_ep')
+api.add_resource(ProductList, '/product')
+api.add_resource(InfoUser, '/user')
 
 
 if __name__ == '__main__':
