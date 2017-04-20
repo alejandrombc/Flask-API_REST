@@ -1,5 +1,5 @@
 # Flask API RESTful
 
-Un API/WebService enfocado a un eCommerce
+Un API/WebService enfocado a un eCommerce usando Flask
 
-![alt text] (https://github.com/alejandrombc/Flask-API_REST/blob/master/modeloBD.png)
+![alt tag](https://raw.githubusercontent.com/alejandrombc/Flask-API_REST/master/modeloBD.png)
